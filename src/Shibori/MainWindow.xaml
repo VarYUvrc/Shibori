@@ -38,7 +38,7 @@
                     <TextBlock Text="{Binding Resolution}" Foreground="#6B7280" Margin="0,3,0,0"/>
                   </StackPanel>
                   <ComboBox Grid.Column="1" Tag="{Binding}" Width="92" Margin="12,0,0,0" VerticalAlignment="Center"
-                            SelectedValue="{Binding Role}" SelectedValuePath="Content" SelectionChanged="Role_SelectionChanged"
+                            SelectedValue="{Binding Role, Mode=OneWay}" SelectedValuePath="Content" SelectionChanged="Role_SelectionChanged"
                             IsEnabled="{Binding IsConnected}">
                     <ComboBoxItem Content="メイン"/>
                     <ComboBoxItem Content="サブ"/>
