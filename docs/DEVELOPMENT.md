@@ -82,7 +82,7 @@ src\Shibori\bin\Release\net8.0-windows\Shibori.exe --partial-test
 
 ## バージョンとGitHub Release
 
-バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.06` です。
+バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.07` です。
 
 Releaseを作成する手順:
 
@@ -91,8 +91,8 @@ Releaseを作成する手順:
 3. 次のコマンドでタグをpushする。
 
 ```powershell
-git tag v2026.07.12.01
-git push origin v2026.07.12.01
+git tag v2026.07.12.07
+git push origin v2026.07.12.07
 ```
 
 `v*` タグのpushをGitHub Actionsが検知し、self-contained x64版をビルドして `Shibori-win-x64.zip` を添付したReleaseを自動作成します。Release本文も非エンジニア向けの日本語でActionsが生成します。Actions実行にはリポジトリのActionsが有効で、`GITHUB_TOKEN` にContents write権限が必要です。

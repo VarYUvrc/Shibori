@@ -9,10 +9,10 @@
     <AssemblyName>Shibori</AssemblyName>
     <RootNamespace>Shibori</RootNamespace>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>2026.7.12.6</Version>
-    <AssemblyVersion>2026.7.12.6</AssemblyVersion>
-    <FileVersion>2026.7.12.6</FileVersion>
-    <InformationalVersion>2026.07.12.06</InformationalVersion>
+    <Version>2026.7.12.7</Version>
+    <AssemblyVersion>2026.7.12.7</AssemblyVersion>
+    <FileVersion>2026.7.12.7</FileVersion>
+    <InformationalVersion>2026.07.12.07</InformationalVersion>
     <ApplicationIcon>Assets\shibori.ico</ApplicationIcon>
   </PropertyGroup>
 </Project>
