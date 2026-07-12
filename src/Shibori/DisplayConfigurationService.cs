@@ -92,7 +92,7 @@ public sealed class DisplayConfigurationService
     {
         lock (sync)
         {
-            var configuration = CcdConfiguration.Read();
+            var configuration = CcdConfiguration.Read(activeOnly: true);
             var selected = configuration.Paths.FirstOrDefault(path => Matches(path, monitor));
             if (selected is null || (selected.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) == 0)
                 throw new InvalidOperationException("選択したモニターが現在の表示構成に見つかりません。");
@@ -102,12 +102,10 @@ public sealed class DisplayConfigurationService
                 .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
                 .Select(path => path.Info).ToArray();
             var modes = configuration.Modes.ToArray();
-            var index = Array.FindIndex(modes, mode =>
-                mode.InfoType == NativeMethods.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE
-                && mode.Id == selected.Info.SourceInfo.SourceId
-                && mode.AdapterId.LowPart == selected.Info.SourceInfo.AdapterId.LowPart
-                && mode.AdapterId.HighPart == selected.Info.SourceInfo.AdapterId.HighPart);
-            if (index < 0 && selected.Info.SourceInfo.ModeInfoIdx != uint.MaxValue)
+            var index = selected.Info.SourceInfo.SourceModeInfoIdx == NativeMethods.DISPLAYCONFIG_PATH_SOURCE_MODE_IDX_INVALID
+                ? -1
+                : selected.Info.SourceInfo.SourceModeInfoIdx;
+            if (index < 0 && selected.Info.SourceInfo.ModeInfoIdx != NativeMethods.DISPLAYCONFIG_PATH_MODE_IDX_INVALID)
             {
                 var indexed = checked((int)selected.Info.SourceInfo.ModeInfoIdx);
                 if (indexed >= 0 && indexed < modes.Length && modes[indexed].InfoType == NativeMethods.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
@@ -128,12 +126,43 @@ public sealed class DisplayConfigurationService
 
     public void Restore()
     {
-        RestoreInternal(null);
+        RestoreInternalStable(null);
     }
 
     public void Restore(MonitorInfo monitor)
     {
-        RestoreInternal(monitor);
+        RestoreInternalStable(monitor);
+    }
+
+    private void RestoreInternalStable(MonitorInfo? monitorToRestore)
+    {
+        lock (sync)
+        {
+            var backup = backupConfiguration ?? LoadBackupConfiguration()
+                ?? throw new InvalidOperationException("復旧用のバックアップがありません。");
+            var current = CcdConfiguration.Read();
+            var activeKeys = current.Paths.Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                .Select(path => path.PathKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var activeTargets = current.Paths.Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                .Select(path => path.TargetDevicePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var paths = backup.Paths
+                .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0
+                    && (activeKeys.Contains(path.PathKey) || activeTargets.Contains(path.TargetDevicePath)
+                        || (monitorToRestore is not null && Matches(path, monitorToRestore))))
+                .Select(path => path.Info).ToArray();
+            if (paths.Length == 0) throw new InvalidOperationException("復旧対象の表示パスが見つかりません。");
+            var result = NativeMethods.SetDisplayConfig(
+                (uint)paths.Length, paths, (uint)backup.Modes.Length, backup.Modes,
+                NativeMethods.SDC_APPLY | NativeMethods.SDC_USE_SUPPLIED_DISPLAY_CONFIG
+                    | NativeMethods.SDC_ALLOW_CHANGES | NativeMethods.SDC_VIRTUAL_MODE_AWARE
+                    | NativeMethods.SDC_VIRTUAL_REFRESH_RATE_AWARE | NativeMethods.SDC_FORCE_MODE_ENUMERATION);
+            if (result != 0) throw new InvalidOperationException($"表示構成の復元に失敗しました (エラーコード: {result})。");
+            if (monitorToRestore is null || !GetMonitors().Any(monitor => !monitor.IsConnected))
+            {
+                backupConfiguration = null;
+                File.Delete(BackupPath);
+            }
+        }
     }
 
     private void RestoreInternal(MonitorInfo? monitorToRestore)
@@ -300,9 +329,9 @@ public sealed class DisplayConfigurationService
         public CcdConfiguration Clone() => new(
             Paths.Select(path => new CcdPath(path.Info, path.SourceDeviceName, path.PathKey, path.FriendlyName, path.TargetDevicePath)).ToList(), Modes.ToArray());
 
-        public static CcdConfiguration Read()
+        public static CcdConfiguration Read(bool activeOnly = false)
         {
-            var flags = NativeMethods.QDC_ALL_PATHS | NativeMethods.QDC_VIRTUAL_MODE_AWARE;
+            var flags = (activeOnly ? NativeMethods.QDC_ONLY_ACTIVE_PATHS : NativeMethods.QDC_ALL_PATHS) | NativeMethods.QDC_VIRTUAL_MODE_AWARE;
             var result = NativeMethods.GetDisplayConfigBufferSizes(flags, out var pathCount, out var modeCount);
             if (result != 0) throw new InvalidOperationException($"表示構成のサイズを取得できませんでした (エラーコード: {result})。");
             var paths = new NativeMethods.DISPLAYCONFIG_PATH_INFO[pathCount];
@@ -371,7 +400,10 @@ internal static class NativeMethods
     public const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
     public const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
     public const uint DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1;
+    public const ushort DISPLAYCONFIG_PATH_SOURCE_MODE_IDX_INVALID = 0xFFFF;
+    public const uint DISPLAYCONFIG_PATH_MODE_IDX_INVALID = 0xFFFFFFFF;
     public const uint QDC_ALL_PATHS = 1;
+    public const uint QDC_ONLY_ACTIVE_PATHS = 2;
     public const uint QDC_VIRTUAL_MODE_AWARE = 0x10;
     public const uint SDC_APPLY = 0x80;
     public const uint SDC_USE_SUPPLIED_DISPLAY_CONFIG = 0x20;
@@ -388,7 +420,14 @@ internal static class NativeMethods
 
     [StructLayout(LayoutKind.Sequential)] public struct LUID { public uint LowPart; public int HighPart; }
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_RATIONAL { public uint Numerator; public uint Denominator; }
-    [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_PATH_SOURCE_INFO { public LUID AdapterId; public uint SourceId; public uint ModeInfoIdx; public uint StatusFlags; }
+    [StructLayout(LayoutKind.Explicit, Size = 20)] public struct DISPLAYCONFIG_PATH_SOURCE_INFO
+    {
+        [FieldOffset(0)] public LUID AdapterId;
+        [FieldOffset(8)] public uint SourceId;
+        [FieldOffset(12)] public uint ModeInfoIdx;
+        [FieldOffset(14)] public ushort SourceModeInfoIdx;
+        [FieldOffset(16)] public uint StatusFlags;
+    }
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_PATH_TARGET_INFO { public LUID AdapterId; public uint Id; public uint ModeInfoIdx; public uint OutputTechnology; public uint Rotation; public uint Scaling; public DISPLAYCONFIG_RATIONAL RefreshRate; public uint ScanLineOrdering; public int TargetAvailable; public uint StatusFlags; }
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_PATH_INFO { public DISPLAYCONFIG_PATH_SOURCE_INFO SourceInfo; public DISPLAYCONFIG_PATH_TARGET_INFO TargetInfo; public uint Flags; }
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_VIDEO_SIGNAL_INFO { public ulong PixelRate; public DISPLAYCONFIG_RATIONAL HSyncFreq; public DISPLAYCONFIG_RATIONAL VSyncFreq; public DISPLAYCONFIG_2DREGION ActiveSize; public DISPLAYCONFIG_2DREGION TotalSize; public uint VideoStandard; public uint ScanLineOrdering; public uint AdditionalVideoSignalInfo; }
