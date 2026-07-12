@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\Shibori\Shibori.csproj"
-$output = Join-Path $root "artifacts\latest"
+$output = Join-Path $root "src\Shibori\bin\Release\net8.0-windows\win-x64\publish"
 
 if (Test-Path $output) { Remove-Item -LiteralPath $output -Recurse -Force }
 New-Item -ItemType Directory -Path $output -Force | Out-Null

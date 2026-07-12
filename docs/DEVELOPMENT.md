@@ -19,7 +19,7 @@
 - `docs/DEVELOPMENT.md`: このドキュメント
 - `docs/RELEASE.md`: 利用者向けのRelease本文・SmartScreen・スタートアップ案内
 
-ビルド成果物は `src/Shibori/bin/` または `artifacts/` に出力します。`bin/` と `obj/` はGit管理対象外です。
+ビルド成果物は `src/Shibori/bin/` に出力します。`bin/` と `obj/` はGit管理対象外です。
 
 ## 最新版をローカルで作成・起動する（一コマンド）
 
@@ -29,7 +29,7 @@
 powershell -ExecutionPolicy Bypass -File .\scripts\build-local.ps1
 ```
 
-このコマンドは、古い成果物を削除し、復元・Release publishを行い、`artifacts/latest/Shibori.exe` を起動します。以後の確認は、以前の `bin` 配下のexeではなく、このexeを使用してください。
+このコマンドは、古いpublish成果物を削除し、復元・Release publishを行い、`src/Shibori/bin/Release/net8.0-windows/win-x64/publish/Shibori.exe` を起動します。
 
 起動せずにビルドだけ行う場合:
 
@@ -59,8 +59,8 @@ dotnet build Shibori.sln --configuration Release --no-restore
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run-diagnostics.ps1
-artifacts\latest\Shibori.exe --self-test
-artifacts\latest\Shibori.exe --partial-test
+src\Shibori\bin\Release\net8.0-windows\Shibori.exe --self-test
+src\Shibori\bin\Release\net8.0-windows\Shibori.exe --partial-test
 ```
 
 テストは実際の表示構成を変更します。2台以上のモニターを接続し、操作中にアプリやケーブルを切断しないでください。通常ログは1日1MBまで、14日を超えたログは削除します。診断ログは2MBを上限とします。
@@ -79,7 +79,7 @@ artifacts\latest\Shibori.exe --partial-test
 
 ## バージョンとGitHub Release
 
-バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.04` です。
+バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.05` です。
 
 Releaseを作成する手順:
 

@@ -102,7 +102,17 @@ public sealed class DisplayConfigurationService
                 .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
                 .Select(path => path.Info).ToArray();
             var modes = configuration.Modes.ToArray();
-            var index = checked((int)selected.Info.SourceInfo.ModeInfoIdx);
+            var index = Array.FindIndex(modes, mode =>
+                mode.InfoType == NativeMethods.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE
+                && mode.Id == selected.Info.SourceInfo.SourceId
+                && mode.AdapterId.LowPart == selected.Info.SourceInfo.AdapterId.LowPart
+                && mode.AdapterId.HighPart == selected.Info.SourceInfo.AdapterId.HighPart);
+            if (index < 0 && selected.Info.SourceInfo.ModeInfoIdx != uint.MaxValue)
+            {
+                var indexed = checked((int)selected.Info.SourceInfo.ModeInfoIdx);
+                if (indexed >= 0 && indexed < modes.Length && modes[indexed].InfoType == NativeMethods.DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+                    index = indexed;
+            }
             if (index < 0 || index >= modes.Length)
                 throw new InvalidOperationException("選択したモニターの表示モードを取得できません。");
             modes[index].ModeInfo.SourceMode.PositionX = 0;
@@ -360,6 +370,7 @@ internal static class NativeMethods
     public const uint DISPLAYCONFIG_PATH_ACTIVE = 0x00000001;
     public const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
     public const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
+    public const uint DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1;
     public const uint QDC_ALL_PATHS = 1;
     public const uint QDC_VIRTUAL_MODE_AWARE = 0x10;
     public const uint SDC_APPLY = 0x80;
