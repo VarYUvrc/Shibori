@@ -79,7 +79,7 @@ artifacts\latest\Shibori.exe --partial-test
 
 ## バージョンとGitHub Release
 
-バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.01` です。
+バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.02` です。
 
 Releaseを作成する手順:
 
