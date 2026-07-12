@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using MessageBox = System.Windows.MessageBox;
 using MessageBoxButton = System.Windows.MessageBoxButton;
@@ -11,6 +10,7 @@ public partial class MainWindow : Window
 {
     private readonly DisplayConfigurationService displayService = new();
     private bool suppressCheckEvents;
+    private bool busy;
 
     public MainWindow()
     {
@@ -34,12 +34,10 @@ public partial class MainWindow : Window
 
     private void Monitor_Click(object sender, RoutedEventArgs e)
     {
-        if (suppressCheckEvents || sender is not WpfCheckBox { Tag: MonitorInfo monitor } checkBox) return;
+        if (suppressCheckEvents || busy || sender is not WpfCheckBox { Tag: MonitorInfo monitor } checkBox) return;
         if (checkBox.IsChecked == true)
         {
-            if (!displayService.HasBackup) return;
-            try { displayService.Restore(); UpdateState("元の表示構成に戻しました"); Reload(); }
-            catch (Exception ex) { checkBox.IsChecked = false; ShowError(ex); }
+            RunDisplayOperation(displayService.Restore, "元の表示構成に戻しました");
             return;
         }
 
@@ -52,17 +50,28 @@ public partial class MainWindow : Window
             return;
         }
 
+        RunDisplayOperation(() => displayService.Pause([monitor]), $"{monitor.DeviceName} を一時停止しました");
+    }
+
+    private void RunDisplayOperation(Action operation, string successMessage)
+    {
+        busy = true;
+        MonitorList.IsEnabled = false;
         try
         {
-            displayService.Pause([monitor]);
-            UpdateState($"{monitor.DeviceName} を切断しました");
+            operation();
+            UpdateState(successMessage);
+            Reload();
         }
         catch (Exception ex)
         {
-            suppressCheckEvents = true;
-            checkBox.IsChecked = true;
-            suppressCheckEvents = false;
+            Reload();
             ShowError(ex);
+        }
+        finally
+        {
+            busy = false;
+            MonitorList.IsEnabled = true;
         }
     }
 

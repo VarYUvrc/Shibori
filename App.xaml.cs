@@ -14,11 +14,11 @@ public partial class App : Application
         var args = Environment.GetCommandLineArgs();
         diagnosticMode = args.Any(arg => string.Equals(arg, "--diagnose", StringComparison.OrdinalIgnoreCase)
             || string.Equals(arg, "--self-test", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(arg, "--restore", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase));
         if (diagnosticMode)
         {
             if (args.Any(arg => string.Equals(arg, "--self-test", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunSelfTest();
-            else if (args.Any(arg => string.Equals(arg, "--restore", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunRestore();
+            else if (args.Any(arg => string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunPauseOnly();
             else DiagnosticRunner.Run();
         }
     }
@@ -79,14 +79,21 @@ internal static class DiagnosticRunner
         File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
     }
 
-    public static void RunRestore()
+    public static void RunPauseOnly()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
         var log = new StringBuilder();
-        log.AppendLine($"[{DateTimeOffset.Now:O}] database restore started");
-        try { new DisplayConfigurationService().RestoreFromDatabase(); log.AppendLine("Restore from database: OK"); }
+        log.AppendLine($"[{DateTimeOffset.Now:O}] pause-only test started");
+        try
+        {
+            var service = new DisplayConfigurationService();
+            var monitor = service.GetMonitors().FirstOrDefault(item => !item.IsPrimary && item.IsConnected)
+                ?? throw new InvalidOperationException("サブモニターが見つかりません。");
+            service.Pause([monitor]);
+            log.AppendLine($"Pause only: OK ({monitor.DeviceName})");
+        }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
-        log.AppendLine($"[{DateTimeOffset.Now:O}] database restore finished");
+        log.AppendLine($"[{DateTimeOffset.Now:O}] pause-only test finished");
         File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
     }
 }
