@@ -80,10 +80,7 @@ public partial class MainWindow : Window
             UpdateButton.Content = $"update to v{update.VersionLabel}";
             UpdateButton.Visibility = Visibility.Visible;
             AppLogger.Info($"Update available: {update.VersionLabel}");
-            if (UpdateButton.Visibility == Visibility.Collapsed)
-            {
             if (CopyableDialog.Show(this, "アップデートがあります", $"現在: {UpdateChecker.CurrentVersionLabel}\n最新: {update.VersionLabel}", "今すぐ更新")) await InstallUpdateAsync();
-            }
         }
         catch (Exception ex) { AppLogger.Error(ex, "Update check failed"); }
     }

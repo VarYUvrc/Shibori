@@ -70,13 +70,41 @@ internal static class DiagnosticRunner
         try
         {
             var service = new DisplayConfigurationService();
-            var monitor = service.GetMonitors().FirstOrDefault(item => !item.IsPrimary)
+            if (service.HasBackup) service.Restore();
+            var initial = service.GetMonitors().Where(item => item.IsConnected).ToArray();
+            var originalPrimary = initial.Single(item => item.IsPrimary);
+            var monitor = initial.FirstOrDefault(item => !item.IsPrimary)
                 ?? throw new InvalidOperationException("サブモニターが見つかりません。");
             log.AppendLine($"Target: {monitor.DeviceName}");
+            service.SetPrimary(monitor);
+            if (!service.GetMonitors().Single(item => item.PathKey == monitor.PathKey).IsPrimary)
+                throw new InvalidOperationException("メインモニターの変更結果が反映されていません。");
+            log.AppendLine("Set primary: OK");
+            service.SetPrimary(originalPrimary);
+            if (!service.GetMonitors().Single(item => item.PathKey == originalPrimary.PathKey).IsPrimary)
+                throw new InvalidOperationException("元のメインモニターへ戻せませんでした。");
+            log.AppendLine("Restore primary: OK");
             service.Pause([monitor]);
+            if (service.GetMonitors().Single(item => item.PathKey == monitor.PathKey).IsConnected)
+                throw new InvalidOperationException("サブモニターが停止されていません。");
             log.AppendLine("Pause: OK");
             service.Restore();
+            if (service.GetMonitors().Count(item => item.IsConnected) != initial.Length)
+                throw new InvalidOperationException("全モニターが復元されていません。");
             log.AppendLine("Restore: OK");
+            service.Pause([originalPrimary]);
+            var withoutPrimary = service.GetMonitors();
+            if (withoutPrimary.Single(item => item.PathKey == originalPrimary.PathKey).IsConnected
+                || withoutPrimary.Count(item => item.IsConnected) != initial.Length - 1
+                || withoutPrimary.Count(item => item.IsPrimary) != 1)
+                throw new InvalidOperationException("メインモニターの停止結果が不正です。");
+            log.AppendLine("Pause primary: OK");
+            service.Restore();
+            var final = service.GetMonitors();
+            if (final.Count(item => item.IsConnected) != initial.Length
+                || !final.Single(item => item.PathKey == originalPrimary.PathKey).IsPrimary)
+                throw new InvalidOperationException("元の表示構成へ復元できませんでした。");
+            log.AppendLine("Restore original configuration: OK");
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] self-test finished");

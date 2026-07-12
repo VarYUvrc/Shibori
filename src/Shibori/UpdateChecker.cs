@@ -7,7 +7,7 @@ namespace Shibori;
 
 internal static class UpdateChecker
 {
-    private const string ReleasesUrl = "https://api.github.com/repos/VarYUvrc/Shibori/releases/latest";
+    private const string ReleasesUrl = "https://api.github.com/repos/VarYUvrc/Shibori/releases?per_page=20";
     public const string IssuesUrl = "https://github.com/VarYUvrc/Shibori/issues";
     public static Version CurrentVersion => Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
     public static string CurrentVersionLabel => Format(CurrentVersion);
@@ -16,12 +16,21 @@ internal static class UpdateChecker
     {
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(4) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"Shibori/{CurrentVersionLabel}");
-        var release = await client.GetFromJsonAsync<GitHubRelease>(ReleasesUrl);
-        if (release is null || release.Draft || release.Prerelease || string.IsNullOrWhiteSpace(release.TagName)) return null;
-        var tag = release.TagName.TrimStart('v', 'V');
-        if (!Version.TryParse(tag, out var version) || version <= CurrentVersion) return null;
-        var asset = release.Assets?.FirstOrDefault(item => item.Name.Equals("Shibori-win-x64.zip", StringComparison.OrdinalIgnoreCase));
-        return asset is null ? null : new ReleaseInfo(release.TagName, Format(version), release.HtmlUrl, asset.BrowserDownloadUrl);
+        var releases = await client.GetFromJsonAsync<GitHubRelease[]>(ReleasesUrl) ?? [];
+        return releases
+            .Where(release => !release.Draft && !string.IsNullOrWhiteSpace(release.TagName))
+            .Select(release => (Release: release,
+                Version: Version.TryParse(release.TagName.TrimStart('v', 'V'), out var version) ? version : null))
+            .Where(item => item.Version is not null && item.Version > CurrentVersion)
+            .OrderByDescending(item => item.Version)
+            .Select(item =>
+            {
+                var asset = item.Release.Assets?.FirstOrDefault(candidate =>
+                    candidate.Name.Equals("Shibori-win-x64.zip", StringComparison.OrdinalIgnoreCase));
+                return asset is null ? null : new ReleaseInfo(item.Release.TagName, Format(item.Version!),
+                    item.Release.HtmlUrl, asset.BrowserDownloadUrl);
+            })
+            .FirstOrDefault(item => item is not null);
     }
 
     public static string Format(Version version) => $"{version.Major:0000}.{version.Minor:00}.{version.Build:00}.{Math.Max(version.Revision, 0):00}";
