@@ -1,15 +1,16 @@
 using System.Windows;
 using System.Windows.Controls;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
 using MessageBox = System.Windows.MessageBox;
 using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxImage = System.Windows.MessageBoxImage;
-using MessageBoxResult = System.Windows.MessageBoxResult;
 
 namespace Shibori;
 
 public partial class MainWindow : Window
 {
     private readonly DisplayConfigurationService displayService = new();
+    private bool suppressCheckEvents;
 
     public MainWindow()
     {
@@ -23,41 +24,51 @@ public partial class MainWindow : Window
     {
         try
         {
+            suppressCheckEvents = true;
             MonitorList.ItemsSource = displayService.GetMonitors();
+            suppressCheckEvents = false;
             UpdateState("準備完了");
         }
-        catch (Exception ex) { ShowError(ex); }
+        catch (Exception ex) { suppressCheckEvents = false; ShowError(ex); }
     }
 
-    private void MonitorList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void Monitor_Click(object sender, RoutedEventArgs e)
     {
-        PauseButton.IsEnabled = MonitorList.SelectedItems.Count > 0;
-    }
-
-    private void Pause_Click(object sender, RoutedEventArgs e)
-    {
-        var selected = MonitorList.SelectedItems.Cast<MonitorInfo>().ToArray();
-        if (selected.Any(m => m.IsPrimary))
+        if (suppressCheckEvents || sender is not WpfCheckBox { Tag: MonitorInfo monitor } checkBox) return;
+        if (checkBox.IsChecked == true)
         {
-            MessageBox.Show(this, "メインモニターは一時停止できません。", "Shibori", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!displayService.HasBackup) return;
+            try { displayService.Restore(); UpdateState("元の表示構成に戻しました"); Reload(); }
+            catch (Exception ex) { checkBox.IsChecked = false; ShowError(ex); }
             return;
         }
-        var answer = MessageBox.Show(this, $"{selected.Length}台のモニターを一時停止しますか？\n現在の構成は自動的にバックアップされます。", "確認", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
-        try { displayService.Pause(selected); UpdateState("一時停止しました"); Reload(); }
-        catch (Exception ex) { ShowError(ex); }
-    }
 
-    private void Restore_Click(object sender, RoutedEventArgs e)
-    {
-        try { displayService.Restore(); UpdateState("元の構成に戻しました"); Reload(); }
-        catch (Exception ex) { ShowError(ex); }
+        if (monitor.IsPrimary)
+        {
+            suppressCheckEvents = true;
+            checkBox.IsChecked = true;
+            suppressCheckEvents = false;
+            MessageBox.Show(this, "メインモニターは切断できません。", "Shibori", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            displayService.Pause([monitor]);
+            UpdateState($"{monitor.DeviceName} を切断しました");
+        }
+        catch (Exception ex)
+        {
+            suppressCheckEvents = true;
+            checkBox.IsChecked = true;
+            suppressCheckEvents = false;
+            ShowError(ex);
+        }
     }
 
     private void UpdateState(string message)
     {
         StatusText.Text = message;
-        RestoreButton.IsEnabled = displayService.HasBackup;
         BackupText.Text = displayService.GetBackupTime() is { } time
             ? $"バックアップ: {time.ToLocalTime():yyyy/MM/dd HH:mm}"
             : "バックアップなし";
