@@ -36,19 +36,9 @@ jobs:
           Copy-Item README.md $staging
           Compress-Archive -Path "$staging/*" -DestinationPath "staging/Shibori-win-x64.zip" -Force
           $version = "${{ github.ref_name }}".TrimStart('v')
-          @"
-          # Shibori $version
-
-          Windows 11向けのShibori最新版です。
-
-          ## ダウンロード
-
-          `Shibori-win-x64.zip`を展開し、`Shibori.exe`を実行してください。追加の.NETランタイムは不要です。
-
-          ## 更新内容
-
-          詳細はコミット履歴とREADMEを参照してください。
-          "@ | Set-Content -Encoding UTF8 staging/release-notes.md
+          $notes = Get-Content -LiteralPath "docs/RELEASE.md" -Raw
+          $notes = $notes.Replace("# Shibori リリース案内", "# Shibori $version")
+          Set-Content -LiteralPath "staging/release-notes.md" -Value $notes -Encoding UTF8
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

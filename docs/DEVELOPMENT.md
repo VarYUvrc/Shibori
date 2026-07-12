@@ -17,6 +17,7 @@
 - `scripts/`: ローカルビルド、診断、アイコン生成
 - `.github/workflows/`: CIビルドとRelease作成
 - `docs/DEVELOPMENT.md`: このドキュメント
+- `docs/RELEASE.md`: 利用者向けのRelease本文・SmartScreen・スタートアップ案内
 
 ビルド成果物は `src/Shibori/bin/` または `artifacts/` に出力します。`bin/` と `obj/` はGit管理対象外です。
 
