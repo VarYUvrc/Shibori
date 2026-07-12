@@ -33,6 +33,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item "$publish/Shibori.exe" $staging
           Copy-Item LICENSE $staging
+          Copy-Item THIRD-PARTY-NOTICES.md $staging
           Copy-Item README.md $staging
           Compress-Archive -Path "$staging/*" -DestinationPath "staging/Shibori-win-x64.zip" -Force
           Copy-Item "docs/RELEASE.md" "staging/release-notes.md"
