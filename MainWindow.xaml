@@ -5,13 +5,17 @@
         WindowStartupLocation="CenterScreen" Background="#FAFAFA">
   <Window.Resources>
     <Style TargetType="CheckBox"><Setter Property="FontSize" Value="15"/><Setter Property="Padding" Value="8"/><Setter Property="Margin" Value="0,0,0,8"/></Style>
+    <Style x:Key="FlatIconButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    </Style>
   </Window.Resources>
   <Grid Margin="28">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <Grid Margin="0,0,0,18">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <StackPanel><TextBlock Text="Shibori" FontSize="28" FontWeight="SemiBold" Foreground="#202124"/><TextBlock Text="使わないモニターを一時停止" Margin="0,4,0,0" Foreground="#6B7280"/></StackPanel>
-      <Button x:Name="InfoButton" Grid.Column="1" Content="ⓘ" FontSize="18" Width="32" Height="32" Padding="0" Margin="12,0,0,0" Click="About_Click" ToolTip="バージョン情報"/>
+      <Button x:Name="UpdateButton" Grid.Column="1" Visibility="Collapsed" Click="Update_Click" Margin="0,0,8,0" Padding="10,6"/>
+      <Button x:Name="InfoButton" Grid.Column="2" Content="ⓘ" FontSize="18" Width="32" Height="32" Padding="0" Margin="0" Click="About_Click" Style="{StaticResource FlatIconButton}" ToolTip="バージョン情報"/>
     </Grid>
     <Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="6" Padding="14" Background="White">
       <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="MonitorList"><ItemsControl.ItemTemplate><DataTemplate>

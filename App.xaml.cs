@@ -38,7 +38,7 @@ public partial class App : Application
 
 internal static class DiagnosticRunner
 {
-    public static string LogPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Shibori", "shibori.log");
+    public static string LogPath => Path.Combine(AppLogger.DirectoryPath, "diagnostics.log");
 
     public static void Run()
     {
@@ -57,7 +57,7 @@ internal static class DiagnosticRunner
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] finished");
-        File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
+        WriteLog(log.ToString());
     }
 
     public static void RunSelfTest()
@@ -78,7 +78,7 @@ internal static class DiagnosticRunner
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] self-test finished");
-        File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
+        WriteLog(log.ToString());
     }
 
     public static void RunPauseOnly()
@@ -96,7 +96,7 @@ internal static class DiagnosticRunner
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] pause-only test finished");
-        File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
+        WriteLog(log.ToString());
     }
 
     public static void RunPartialRestoreTest()
@@ -119,6 +119,13 @@ internal static class DiagnosticRunner
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] partial-restore test finished");
-        File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
+        WriteLog(log.ToString());
+    }
+
+    private static void WriteLog(string content)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+        if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 2 * 1024 * 1024) File.Delete(LogPath);
+        File.AppendAllText(LogPath, content, Encoding.UTF8);
     }
 }

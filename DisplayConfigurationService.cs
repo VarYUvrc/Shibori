@@ -126,7 +126,7 @@ public sealed class DisplayConfigurationService
                 .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
                 .Select(path => path.PathKey)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (originalActiveKeys.IsSubsetOf(currentActiveKeys))
+            if (monitorToRestore is null || originalActiveKeys.IsSubsetOf(currentActiveKeys))
             {
                 backupConfiguration = null;
                 File.Delete(BackupPath);
