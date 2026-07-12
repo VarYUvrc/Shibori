@@ -1,0 +1,64 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Dd]ebug*/
+[Rr]elease*/
+x64/
+x86/
+arm64/
+[Pp]ublish/
+
+# Visual Studio / .NET user state
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.ncb
+*.vcxproj.user
+
+# JetBrains Rider / ReSharper
+.idea/
+*.sln.iml
+_ReSharper*/
+
+# VS Code workspace settings (keep shared project settings if added intentionally)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
+
+# NuGet and package artifacts
+packages/
+*.nupkg
+*.snupkg
+project.assets.json
+project.packagespec.json
+*.nuget.g.props
+*.nuget.g.targets
+
+# Test, coverage, and analyzer output
+TestResults/
+test-results/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# Generated logs and local runtime data
+*.log
+display-backup.json
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
