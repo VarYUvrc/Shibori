@@ -17,6 +17,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+        InfoButton.ToolTip = $"Shibori v{version}";
         Loaded += async (_, _) =>
         {
             Reload();
