@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfToggleButton = System.Windows.Controls.Primitives.ToggleButton;
 
 namespace Shibori;
 
@@ -47,6 +48,20 @@ public partial class MainWindow : Window
     {
         if (busy || sender is not WpfComboBox { Tag: MonitorInfo monitor, SelectedValue: string role } || role != "メイン" || monitor.IsPrimary)
             return;
+        RunDisplayOperation(() => displayService.SetPrimary(monitor));
+    }
+
+    private void PrimaryToggle_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (busy || sender is not WpfToggleButton { Tag: MonitorInfo monitor } toggle) return;
+        if (!monitor.IsConnected) return;
+        if (!toggle.IsChecked.GetValueOrDefault())
+        {
+            toggle.IsChecked = true;
+            return;
+        }
+        if (monitor.IsPrimary) return;
         RunDisplayOperation(() => displayService.SetPrimary(monitor));
     }
 
