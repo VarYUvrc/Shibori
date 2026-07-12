@@ -1,3 +1,6 @@
-# Repository guidance
-
-Read [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) before changing the application. It is the repository's single source of truth for layout, commands, tests, display invariants, recovery, versioning, and release behavior.
+- 想定外の失敗が発生したときは原因を推測して場当たり的な堅牢化や回避策で対応しようとせず、まず何が起こっているのか確認するコードを書いたり確認処理を実行したりして根本原因を突き止めるまで対策を行わないこと。この方針により開発で浪費するトークン数を削減することができる。
+- 新しい仕様を開発するとき、旧仕様は破壊的変更を伴っても構わないので削除を基本としてください。Fallbackを残すことや旧仕様に回帰しないことを確認するためだけのテストコードなどはトークンの無駄です。
+- 前回からの差分は記録に残しながら開発するため、`PLANS.md`に粗い粒度で箇条書きで記載してください。冒頭に["削除","仕様変更", "機能追加"]などのタグをつけてください。タグをつけた親要素に付随するより細かい粒度の変更は箇条書きの子要素としてタグ無しでネストしてください。ドキュメント更新やテスト実行などの開発差分に関係のないものは記載しないでください。
+- ドキュメントはSSoTとして扱い、常に更新し、ドキュメントファイル数は最小限にしてください。情報が散逸すると実装への追従遅れが発生してしまうため。
+- 禁止事項: 命令される前にgit commit/push、AGENTS.mdの書き換えは禁止する。
+- 
