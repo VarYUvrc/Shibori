@@ -43,10 +43,10 @@
         <ScrollViewer Grid.Row="1" Grid.ColumnSpan="5" VerticalScrollBarVisibility="Auto">
           <ItemsControl x:Name="MonitorList">
             <ItemsControl.ItemTemplate><DataTemplate>
-              <Grid Margin="0,0,0,10">
+              <Grid Height="32" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="64"/><ColumnDefinition Width="*"/><ColumnDefinition Width="90"/><ColumnDefinition Width="115"/></Grid.ColumnDefinitions>
-                <ToggleButton Tag="{Binding}" IsChecked="{Binding IsConnected, Mode=OneWay}" Style="{StaticResource ConnectionToggle}" Click="ConnectionToggle_Click" HorizontalAlignment="Left" Margin="8,0,0,0"/>
-                <CheckBox Grid.Column="1" Tag="{Binding}" IsChecked="{Binding IsPrimary, Mode=OneWay}" IsEnabled="{Binding IsConnected}" Click="MainCheckBox_Click" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                <ToggleButton Tag="{Binding}" IsChecked="{Binding IsConnected, Mode=OneWay}" Style="{StaticResource ConnectionToggle}" Click="ConnectionToggle_Click" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <CheckBox Grid.Column="1" Tag="{Binding}" IsChecked="{Binding IsPrimary, Mode=OneWay}" IsEnabled="{Binding IsConnected}" Click="MainCheckBox_Click" HorizontalAlignment="Left" VerticalAlignment="Center" Height="24" Padding="0" Margin="10,0,0,0" VerticalContentAlignment="Center"/>
                 <TextBlock Grid.Column="2" Text="{Binding FriendlyName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0" ToolTip="{Binding FriendlyName}"/>
                 <TextBlock Grid.Column="3" Text="{Binding Resolution}" Foreground="#6B7280" VerticalAlignment="Center" Margin="8,0"/>
                 <TextBlock Grid.Column="4" Text="{Binding DeviceName}" Foreground="#9CA3AF" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="8,0" ToolTip="{Binding DeviceName}"/>
@@ -56,5 +56,11 @@
         </ScrollViewer>
       </Grid>
     </Border>
+    <Grid x:Name="BusyOverlay" Grid.RowSpan="2" Visibility="Collapsed" Panel.ZIndex="20" Background="#99FFFFFF">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="220">
+        <ProgressBar IsIndeterminate="True" Height="5" Margin="0,0,0,10"/>
+        <TextBlock Text="アップデート中…" HorizontalAlignment="Center" Foreground="#374151"/>
+      </StackPanel>
+    </Grid>
   </Grid>
 </Window>

@@ -80,7 +80,10 @@ public partial class MainWindow : Window
             UpdateButton.Content = $"update to v{update.VersionLabel}";
             UpdateButton.Visibility = Visibility.Visible;
             AppLogger.Info($"Update available: {update.VersionLabel}");
+            if (UpdateButton.Visibility == Visibility.Collapsed)
+            {
             if (CopyableDialog.Show(this, "アップデートがあります", $"現在: {UpdateChecker.CurrentVersionLabel}\n最新: {update.VersionLabel}", "今すぐ更新")) await InstallUpdateAsync();
+            }
         }
         catch (Exception ex) { AppLogger.Error(ex, "Update check failed"); }
     }
@@ -90,9 +93,22 @@ public partial class MainWindow : Window
     private async Task InstallUpdateAsync()
     {
         if (pendingUpdate is null || busy) return;
-        busy = true; UpdateButton.IsEnabled = false;
+        busy = true;
+        UpdateButton.IsEnabled = false;
+        InfoButton.IsEnabled = false;
+        MonitorList.IsEnabled = false;
+        BusyOverlay.Visibility = Visibility.Visible;
         try { await UpdateInstaller.InstallAsync(pendingUpdate); }
-        catch (Exception ex) { busy = false; UpdateButton.IsEnabled = true; AppLogger.Error(ex, "Update installation failed"); ShowError(ex); }
+        catch (Exception ex)
+        {
+            busy = false;
+            UpdateButton.IsEnabled = true;
+            InfoButton.IsEnabled = true;
+            MonitorList.IsEnabled = true;
+            BusyOverlay.Visibility = Visibility.Collapsed;
+            AppLogger.Error(ex, "Update installation failed");
+            ShowError(ex);
+        }
     }
 
     private void ShowError(Exception ex) => CopyableDialog.Show(this, "Shibori", ex.Message, secondaryButton: "ログフォルダーを開く", tertiaryButton: "ログファイルを開く");
