@@ -30,7 +30,7 @@ jobs:
 
       - name: Publish self-contained win-x64
         run: >-
-          dotnet publish Shibori.csproj --configuration Release --runtime win-x64
+          dotnet publish src/Shibori/Shibori.csproj --configuration Release --runtime win-x64
           --self-contained true --no-restore
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None -p:DebugSymbols=false
@@ -38,7 +38,7 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $publish = "bin/Release/net8.0-windows/win-x64/publish"
+          $publish = "src/Shibori/bin/Release/net8.0-windows/win-x64/publish"
           $staging = "staging/Shibori-win-x64"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item "$publish/Shibori.exe" $staging

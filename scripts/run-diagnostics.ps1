@@ -5,10 +5,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$project = Join-Path $root "Shibori.csproj"
+$project = Join-Path $root "src\Shibori\Shibori.csproj"
 
 dotnet build $project --configuration $Configuration
-$exe = Join-Path $root "bin\$Configuration\net8.0-windows\Shibori.exe"
+$exe = Join-Path $root "src\Shibori\bin\$Configuration\net8.0-windows\Shibori.exe"
 if (-not (Test-Path $exe)) { throw "実行ファイルが見つかりません: $exe" }
 
 if ($SelfTest) { & $exe --self-test } else { & $exe --diagnose }

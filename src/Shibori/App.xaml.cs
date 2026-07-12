@@ -7,11 +7,13 @@ namespace Shibori;
 
 public partial class App : Application
 {
+    public static bool StartedWithWindows { get; private set; }
     private readonly bool diagnosticMode;
 
     public App()
     {
         var args = Environment.GetCommandLineArgs();
+        StartedWithWindows = args.Any(arg => string.Equals(arg, "--startup", StringComparison.OrdinalIgnoreCase));
         diagnosticMode = args.Any(arg => string.Equals(arg, "--diagnose", StringComparison.OrdinalIgnoreCase)
             || string.Equals(arg, "--self-test", StringComparison.OrdinalIgnoreCase)
             || string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase)
@@ -111,11 +113,21 @@ internal static class DiagnosticRunner
             if (monitors.Length < 2) throw new InvalidOperationException("サブモニターが2台必要です。");
             service.Pause([monitors[0]]);
             service.Pause([monitors[1]]);
+            var paused = service.GetMonitors();
+            if (paused.Count(monitor => monitor.IsConnected) != 1 || paused.Count(monitor => !monitor.IsConnected) != 2)
+                throw new InvalidOperationException("Partial pause changed an unrelated monitor.");
             service.Restore(monitors[0]);
             var middle = service.GetMonitors();
-            log.AppendLine($"After restoring one: connected={middle.Count(monitor => monitor.IsConnected)}, stopped={middle.Count(monitor => !monitor.IsConnected)}");
+            var connectedAfterOne = middle.Count(monitor => monitor.IsConnected);
+            var stoppedAfterOne = middle.Count(monitor => !monitor.IsConnected);
+            if (connectedAfterOne != 2 || stoppedAfterOne != 1)
+                throw new InvalidOperationException("Partial restore changed an unrelated monitor.");
+            log.AppendLine($"After restoring one: connected={connectedAfterOne}, stopped={stoppedAfterOne}");
             service.Restore(monitors[1]);
-            log.AppendLine($"After restoring both: connected={service.GetMonitors().Count(monitor => monitor.IsConnected)}");
+            var restored = service.GetMonitors();
+            if (restored.Count(monitor => monitor.IsConnected) != 3 || restored.Any(monitor => !monitor.IsConnected))
+                throw new InvalidOperationException("Full restore did not restore every monitor.");
+            log.AppendLine($"After restoring both: connected={restored.Count(monitor => monitor.IsConnected)}");
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] partial-restore test finished");

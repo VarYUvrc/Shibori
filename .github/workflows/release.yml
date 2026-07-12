@@ -10,30 +10,25 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.x
-
       - name: Restore
         run: dotnet restore Shibori.sln --runtime win-x64
-
       - name: Publish
         run: >-
-          dotnet publish Shibori.csproj --configuration Release --runtime win-x64
+          dotnet publish src/Shibori/Shibori.csproj --configuration Release --runtime win-x64
           --self-contained true --no-restore
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None -p:DebugSymbols=false
-
       - name: Package
         shell: pwsh
         run: |
-          $publish = "bin/Release/net8.0-windows/win-x64/publish"
+          $publish = "src/Shibori/bin/Release/net8.0-windows/win-x64/publish"
           $staging = "staging/Shibori-win-x64"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item "$publish/Shibori.exe" $staging
@@ -44,17 +39,16 @@ jobs:
           @"
           # Shibori $version
 
-          Windows 11向けのShibori配布版です。
+          Windows 11向けのShibori最新版です。
 
           ## ダウンロード
 
-          `Shibori-win-x64.zip`を展開して`Shibori.exe`を実行してください。追加の.NETランタイムは不要です。
+          `Shibori-win-x64.zip`を展開し、`Shibori.exe`を実行してください。追加の.NETランタイムは不要です。
 
-          ## 変更内容
+          ## 更新内容
 
           詳細はコミット履歴とREADMEを参照してください。
           "@ | Set-Content -Encoding UTF8 staging/release-notes.md
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

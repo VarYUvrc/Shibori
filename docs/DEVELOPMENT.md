@@ -1,54 +1,104 @@
-# Shibori 開発SSoT
+# Shibori 開発ドキュメント（SSoT）
 
-このファイルを開発者・コーディングエージェント向けの唯一の開発ドキュメントとする。実装、依存、コマンド、テスト手順を変更した場合は、同じ変更でこのファイルも更新する。
+このファイルを開発・ビルド・テスト・リリース・復旧仕様の唯一の正本として扱います。実装を変更したら、必ずここも更新してください。
 
-## 前提依存
+## 前提
 
 - Windows 11 x64
+- .NET 8 SDK（Windows Desktop SDK / WPFを含む）
 - Git
-- .NET 8 SDK（8.0.x）
-- Windows Desktop SDK / WPF
-- Windows SDK（CCD APIの実行に必要）
-- 外部NuGetパッケージは使用しない
-- SDK確認: `dotnet --info`、`dotnet --list-sdks`
+- 追加のNuGetパッケージは不要
 
-## ローカルビルド
+`dotnet --info` と `dotnet --list-sdks` でSDKを確認します。
 
-1. `git clone https://github.com/VarYUvrc/Shibori.git`
-2. `cd Shibori`
-3. `dotnet restore Shibori.sln`
-4. `dotnet build Shibori.sln --configuration Debug --no-restore`
-5. `dotnet build Shibori.sln --configuration Release --no-restore`
+## リポジトリ構成
 
-成果物は`bin\Debug\net8.0-windows\Shibori.exe`または`bin\Release\net8.0-windows\Shibori.exe`。
+- `src/Shibori/`: WPFアプリ本体とアセット
+- `scripts/`: ローカルビルド、診断、アイコン生成
+- `.github/workflows/`: CIビルドとRelease作成
+- `docs/DEVELOPMENT.md`: このドキュメント
 
-## 配布用ビルド
+ビルド成果物は `src/Shibori/bin/` または `artifacts/` に出力します。`bin/` と `obj/` はGit管理対象外です。
 
-`dotnet restore Shibori.sln --runtime win-x64`を実行後、`dotnet publish Shibori.csproj --configuration Release --runtime win-x64 --self-contained true --no-restore -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false`を実行する。成果物は`bin\Release\net8.0-windows\win-x64\publish\Shibori.exe`。
+## 最新版をローカルで作成・起動する（一コマンド）
 
-## 診断とログ
+リポジトリのルートで次を実行します。
 
-- 診断: `powershell -ExecutionPolicy Bypass -File scripts\run-diagnostics.ps1`
-- 全体自己テスト: `Shibori.exe --self-test`
-- 個別復元自己テスト: `Shibori.exe --partial-test`
-- ログ: `%LOCALAPPDATA%\Shibori\logs\`
-- 通常ログは日次・1MB上限・14日保持、診断ログは2MB上限
-- 自己テストは実際に表示構成を変更するため、複数モニター環境で実行する
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-local.ps1
+```
 
-## 目的と仕様
+このコマンドは、古い成果物を削除し、復元・Release publishを行い、`artifacts/latest/Shibori.exe` を起動します。以後の確認は、以前の `bin` 配下のexeではなく、このexeを使用してください。
 
-ShiboriはWindows 11でVR利用中などに使わないモニターを一時停止するWPFネイティブアプリである。チェックありは接続中、チェックなしは一時停止中。メインモニターは停止不可。停止中のモニターは再起動・再読み込み後も一覧に残り、個別に復元できる。全モニターが復元されるとバックアップを削除する。
+起動せずにビルドだけ行う場合:
 
-## 表示構成の不変条件
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-local.ps1 -NoLaunch
+```
 
-`QueryDisplayConfig(QDC_ALL_PATHS | QDC_VIRTUAL_MODE_AWARE)`でパスを取得し、Adapter LUID + Source IDを安定IDとして使う。`DISPLAY1`などのGDI名は再採番されるため永続IDに使わない。初回停止時にCCDパス・モード配列を`%LOCALAPPDATA%\Shibori\display-backup.json`へ保存し、停止時は対象パスを除外して`SetDisplayConfig`を適用する。個別復元時は現在接続中のパスとクリックされた対象パスだけを再適用する。旧形式のバックアップ読み替えや旧仕様APIへのfallbackは実装しない。
+通常のコンパイルだけを行う場合:
 
-## 更新・ライセンス・構成
+```powershell
+dotnet restore Shibori.sln
+dotnet build Shibori.sln --configuration Release --no-restore
+```
 
-- バージョン形式は`YYYY.MM.DD.NN`。現在は`2026.07.12.01`
-- `UpdateChecker.cs`がGitHub Releasesの最新版と配布zipを確認する
-- 更新ボタンはzipを取得し、アプリ終了後にupdaterが差し替える
-- `AppLogger.cs`が低頻度の操作・エラー・更新ログを出力する
-- `Assets/shibori.svg`が設計ソース、`Assets/shibori.ico`がexe用アイコン。再生成は`scripts/generate-icon.ps1`
-- ShiboriはApache License 2.0。外部NuGetパッケージはない。配布物には.NET 8/WPF/Windows SDK由来のMicrosoftランタイムが含まれる
-- `.github/workflows/build.yml`はCI artifact、`release.yml`は`v*`タグからRelease本文と`Shibori-win-x64.zip`を生成する
+## 日本語ユーザー名・日本語パスへの対応
+
+ユーザーフォルダー名に日本語（ひらがな・カタカナ・漢字）が含まれる環境を前提にします。スクリプトでは固定の `C:\Users\英数字` を使わず、リポジトリ位置はスクリプト自身から、ログ・バックアップ位置はWindowsの環境APIから解決します。
+
+アプリのログと表示構成バックアップは次の場所です。
+
+- `%LOCALAPPDATA%\Shibori\logs\`
+- `%LOCALAPPDATA%\Shibori\display-backup.json`
+
+パスを扱うPowerShellコマンドでは、必ず `-LiteralPath` または引用符を使います。日本語パスを含む場所から実行しても、カレントディレクトリを前提にした固定パスを追加しないでください。
+
+## 診断とテスト
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-diagnostics.ps1
+artifacts\latest\Shibori.exe --self-test
+artifacts\latest\Shibori.exe --partial-test
+```
+
+テストは実際の表示構成を変更します。2台以上のモニターを接続し、操作中にアプリやケーブルを切断しないでください。通常ログは1日1MBまで、14日を超えたログは削除します。診断ログは2MBを上限とします。
+
+## 表示構成と復旧の不変条件
+
+- チェックありは接続中、チェックを外すと一時停止です。
+- メインモニターも停止できますが、最低1台は接続状態を維持します。
+- 各モニターのプルダウンでメイン/サブを選択します。
+- 一時停止前のCCD表示構成を `%LOCALAPPDATA%\Shibori\display-backup.json` に保存します。
+- 部分復旧はCCDパス識別子またはモニターのデバイスパスで対象だけを照合し、他の停止モニターを復旧しません。
+- すべての元のモニターを復旧したときだけバックアップを削除します。
+- 旧バックアップ形式のfallbackは実装しません。スキーマを変更した場合は開発環境のバックアップを削除します。
+
+再起動後にモニターが見つからない場合は、Shiboriを起動してInfo内の復旧手順を確認し、Windowsの表示設定で「検出」を行ってから復旧します。スタートアップ用ショートカットの末尾に `--startup` を付けると、更新モーダルを表示せず起動できます。現状はタスクトレイ常駐ではなく通常ウィンドウです。
+
+## バージョンとGitHub Release
+
+バージョン形式は `YYYY.MM.DD.NN` です。現在のバージョンは `2026.07.12.01` です。
+
+Releaseを作成する手順:
+
+1. `src/Shibori/Shibori.csproj` の `<Version>`、`<AssemblyVersion>`、`<FileVersion>`、`<InformationalVersion>` を同じ更新番号に変更する。
+2. 変更をコミットして `main` にpushする。
+3. 次のコマンドでタグをpushする。
+
+```powershell
+git tag v2026.07.12.01
+git push origin v2026.07.12.01
+```
+
+`v*` タグのpushをGitHub Actionsが検知し、self-contained x64版をビルドして `Shibori-win-x64.zip` を添付したReleaseを自動作成します。Release本文も非エンジニア向けの日本語でActionsが生成します。Actions実行にはリポジトリのActionsが有効で、`GITHUB_TOKEN` にContents write権限が必要です。
+
+## アイコンとライセンス
+
+SVGの正本は `src/Shibori/Assets/shibori.svg`、Windows用ICOは `src/Shibori/Assets/shibori.ico` です。ICOは次で再生成します。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\generate-icon.ps1
+```
+
+ShiboriはApache License 2.0です。.NET 8、WPF、Windows SDKを使用しています。
