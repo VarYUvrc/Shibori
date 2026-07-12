@@ -24,7 +24,7 @@ public sealed class DisplayConfigurationService
             {
                 var saved = backup?.Monitors?.FirstOrDefault(monitor => string.Equals(monitor.PathKey, path.PathKey, StringComparison.OrdinalIgnoreCase));
                 var screen = screens.GetValueOrDefault(path.SourceDeviceName);
-                return new MonitorInfo(index + 1, path.SourceDeviceName, screen?.Bounds.Width ?? saved?.Width ?? 0,
+                return new MonitorInfo(index + 1, path.SourceDeviceName, path.FriendlyName, screen?.Bounds.Width ?? saved?.Width ?? 0,
                     screen?.Bounds.Height ?? saved?.Height ?? 0, screen?.Primary ?? saved?.IsPrimary ?? false, true, path.PathKey);
             }).ToList();
 
@@ -87,12 +87,30 @@ public sealed class DisplayConfigurationService
 
     public void Restore()
     {
+        RestoreInternal(null);
+    }
+
+    public void Restore(MonitorInfo monitor)
+    {
+        RestoreInternal(monitor.PathKey);
+    }
+
+    private void RestoreInternal(string? monitorToRestore)
+    {
         lock (sync)
         {
             var configuration = backupConfiguration ?? LoadBackupConfiguration()
                 ?? throw new InvalidOperationException("復元用のバックアップがありません。");
-            var paths = configuration.Paths
+            var current = CcdConfiguration.Read();
+            var currentActiveKeys = current.Paths
                 .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                .Select(path => path.PathKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (monitorToRestore is not null) currentActiveKeys.Add(monitorToRestore);
+
+            var paths = configuration.Paths
+                .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0
+                    && currentActiveKeys.Contains(path.PathKey))
                 .Select(path => path.Info)
                 .ToArray();
 
@@ -104,8 +122,15 @@ public sealed class DisplayConfigurationService
                     | NativeMethods.SDC_VIRTUAL_REFRESH_RATE_AWARE | NativeMethods.SDC_FORCE_MODE_ENUMERATION);
             if (result != 0) throw new InvalidOperationException($"表示構成の復元に失敗しました (エラーコード: {result})。");
 
-            backupConfiguration = null;
-            File.Delete(BackupPath);
+            var originalActiveKeys = configuration.Paths
+                .Where(path => (path.Info.Flags & NativeMethods.DISPLAYCONFIG_PATH_ACTIVE) != 0)
+                .Select(path => path.PathKey)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (originalActiveKeys.IsSubsetOf(currentActiveKeys))
+            {
+                backupConfiguration = null;
+                File.Delete(BackupPath);
+            }
         }
     }
 
@@ -118,7 +143,7 @@ public sealed class DisplayConfigurationService
         {
             var monitors = GetMonitors().Where(monitor => monitor.IsConnected).ToArray();
             SaveBackup(new DisplayBackup(DateTimeOffset.UtcNow, monitors,
-                backupConfiguration.Paths.Select(path => new BackupPathEntry(path.PathKey, path.SourceDeviceName, Serialize(path.Info))).ToArray(),
+                backupConfiguration.Paths.Select(path => new BackupPathEntry(path.PathKey, path.SourceDeviceName, path.FriendlyName, Serialize(path.Info))).ToArray(),
                 Serialize(backupConfiguration.Modes)));
         }
     }
@@ -136,7 +161,7 @@ public sealed class DisplayConfigurationService
         if (backup.Paths.Length == 0 || string.IsNullOrWhiteSpace(backup.Modes))
             throw new InvalidDataException("Shiboriのバックアップ形式が不正です。バックアップを削除して再作成してください。");
         var paths = backup.Paths.Select(path => new CcdPath(
-            DeserializeValue<NativeMethods.DISPLAYCONFIG_PATH_INFO>(path.Info), path.SourceDeviceName, path.PathKey)).ToList();
+            DeserializeValue<NativeMethods.DISPLAYCONFIG_PATH_INFO>(path.Info), path.SourceDeviceName, path.PathKey, path.FriendlyName)).ToList();
         return new CcdConfiguration(paths, DeserializeArray<NativeMethods.DISPLAYCONFIG_MODE_INFO>(backup.Modes));
     }
 
@@ -200,7 +225,7 @@ public sealed class DisplayConfigurationService
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private sealed record DisplayBackup(DateTimeOffset CreatedAt, MonitorInfo[] Monitors, BackupPathEntry[] Paths, string Modes);
-    private sealed record BackupPathEntry(string PathKey, string SourceDeviceName, string Info);
+    private sealed record BackupPathEntry(string PathKey, string SourceDeviceName, string FriendlyName, string Info);
 
     private sealed class CcdConfiguration
     {
@@ -214,7 +239,7 @@ public sealed class DisplayConfigurationService
         }
 
         public CcdConfiguration Clone() => new(
-            Paths.Select(path => new CcdPath(path.Info, path.SourceDeviceName, path.PathKey)).ToList(), Modes.ToArray());
+            Paths.Select(path => new CcdPath(path.Info, path.SourceDeviceName, path.PathKey, path.FriendlyName)).ToList(), Modes.ToArray());
 
         public static CcdConfiguration Read()
         {
@@ -240,7 +265,22 @@ public sealed class DisplayConfigurationService
                     }
                 };
                 NativeMethods.DisplayConfigGetDeviceInfo(ref sourceName);
-                resultPaths.Add(new CcdPath(path, sourceName.ViewGdiDeviceName ?? string.Empty, PathKey(path.SourceInfo.AdapterId, path.SourceInfo.SourceId)));
+                var targetName = new NativeMethods.DISPLAYCONFIG_TARGET_DEVICE_NAME
+                {
+                    Header = new NativeMethods.DISPLAYCONFIG_DEVICE_INFO_HEADER
+                    {
+                        Type = NativeMethods.DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME,
+                        Size = (uint)Marshal.SizeOf<NativeMethods.DISPLAYCONFIG_TARGET_DEVICE_NAME>(),
+                        AdapterId = path.TargetInfo.AdapterId,
+                        Id = path.TargetInfo.Id
+                    }
+                };
+                NativeMethods.DisplayConfigGetDeviceInfo(ref targetName);
+                resultPaths.Add(new CcdPath(path, sourceName.ViewGdiDeviceName ?? string.Empty,
+                    PathKey(path.SourceInfo.AdapterId, path.SourceInfo.SourceId),
+                    string.IsNullOrWhiteSpace(targetName.MonitorFriendlyDeviceName)
+                        ? sourceName.ViewGdiDeviceName ?? string.Empty
+                        : targetName.MonitorFriendlyDeviceName));
             }
             return new CcdConfiguration(resultPaths, modes[..(int)modeCount]);
         }
@@ -248,15 +288,16 @@ public sealed class DisplayConfigurationService
 
     private static string PathKey(NativeMethods.LUID adapterId, uint sourceId) => $"{adapterId.HighPart:X8}:{adapterId.LowPart:X8}:{sourceId}";
 
-    private sealed class CcdPath(NativeMethods.DISPLAYCONFIG_PATH_INFO info, string sourceDeviceName, string pathKey)
+    private sealed class CcdPath(NativeMethods.DISPLAYCONFIG_PATH_INFO info, string sourceDeviceName, string pathKey, string friendlyName)
     {
         public NativeMethods.DISPLAYCONFIG_PATH_INFO Info { get; } = info;
         public string SourceDeviceName { get; } = sourceDeviceName;
         public string PathKey { get; } = pathKey;
+        public string FriendlyName { get; } = friendlyName;
     }
 }
 
-public sealed record MonitorInfo(int Index, string DeviceName, int Width, int Height, bool IsPrimary, bool IsConnected, string PathKey)
+public sealed record MonitorInfo(int Index, string DeviceName, string FriendlyName, int Width, int Height, bool IsPrimary, bool IsConnected, string PathKey)
 {
     public string Role => IsPrimary ? "メイン" : "サブ";
     public string Resolution => $"{Width} × {Height}";
@@ -267,6 +308,7 @@ internal static class NativeMethods
 {
     public const uint DISPLAYCONFIG_PATH_ACTIVE = 0x00000001;
     public const uint DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1;
+    public const uint DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME = 2;
     public const uint QDC_ALL_PATHS = 1;
     public const uint QDC_VIRTUAL_MODE_AWARE = 0x10;
     public const uint SDC_APPLY = 0x80;
@@ -280,6 +322,7 @@ internal static class NativeMethods
     [DllImport("user32.dll")] public static extern int QueryDisplayConfig(uint flags, ref uint pathCount, [Out] DISPLAYCONFIG_PATH_INFO[] paths, ref uint modeCount, [Out] DISPLAYCONFIG_MODE_INFO[] modes, IntPtr topologyId);
     [DllImport("user32.dll")] public static extern int SetDisplayConfig(uint pathCount, [In] DISPLAYCONFIG_PATH_INFO[]? paths, uint modeCount, [In] DISPLAYCONFIG_MODE_INFO[]? modes, uint flags);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_SOURCE_DEVICE_NAME requestPacket);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int DisplayConfigGetDeviceInfo(ref DISPLAYCONFIG_TARGET_DEVICE_NAME requestPacket);
 
     [StructLayout(LayoutKind.Sequential)] public struct LUID { public uint LowPart; public int HighPart; }
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_RATIONAL { public uint Numerator; public uint Denominator; }
@@ -294,4 +337,15 @@ internal static class NativeMethods
     [StructLayout(LayoutKind.Sequential)] public struct DISPLAYCONFIG_MODE_INFO { public uint InfoType; public uint Id; public LUID AdapterId; public DISPLAYCONFIG_MODE_INFO_UNION ModeInfo; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public struct DISPLAYCONFIG_DEVICE_INFO_HEADER { public uint Type; public uint Size; public LUID AdapterId; public uint Id; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public struct DISPLAYCONFIG_SOURCE_DEVICE_NAME { public DISPLAYCONFIG_DEVICE_INFO_HEADER Header; [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string? ViewGdiDeviceName; }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] public struct DISPLAYCONFIG_TARGET_DEVICE_NAME
+    {
+        public DISPLAYCONFIG_DEVICE_INFO_HEADER Header;
+        public uint Flags;
+        public uint OutputTechnology;
+        public ushort EdidManufactureId;
+        public ushort EdidProductCodeId;
+        public uint ConnectorInstance;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string? MonitorFriendlyDeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string? MonitorDevicePath;
+    }
 }

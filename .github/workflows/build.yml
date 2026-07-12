@@ -1,0 +1,53 @@
+name: Build Shibori
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Restore
+        run: dotnet restore Shibori.sln --runtime win-x64
+
+      - name: Build Release
+        run: dotnet build Shibori.sln --configuration Release --no-restore
+
+      - name: Publish self-contained win-x64
+        run: >-
+          dotnet publish Shibori.csproj --configuration Release --runtime win-x64
+          --self-contained true --no-restore
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=None -p:DebugSymbols=false
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $publish = "bin/Release/net8.0-windows/win-x64/publish"
+          $staging = "staging/Shibori-win-x64"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item "$publish/Shibori.exe" $staging
+          Copy-Item LICENSE $staging
+          Copy-Item README.md $staging
+          Compress-Archive -Path "$staging/*" -DestinationPath "staging/Shibori-win-x64.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shibori-win-x64
+          path: staging/Shibori-win-x64.zip

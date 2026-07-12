@@ -1,18 +1,34 @@
-# MultiMonitorPauser-Shibori
+# Shibori
 
-Windows 11向けの軽量ユーティリティです。複数モニターやVRヘッドセットを利用するとき、未使用モニターをWindowsのデスクトップ構成から一時的に切断し、GPU負荷を抑えます。
+Windows 11で、VR利用中などに使わないモニターを一時停止する小さなネイティブアプリです。
 
-## MVP
+## ダウンロード
 
-- 管理者権限不要
-- 外部パッケージ不要
-- 常駐せず、操作後に終了
-- Windows CCD API（QueryDisplayConfig / SetDisplayConfig）を使った表示構成の切替
-- 現在の構成を保存し、復帰操作で元に戻す
+最新版は[GitHub Releases](https://github.com/VarYUvrc/Shibori/releases)からダウンロードしてください。
 
-## 開発
+`Shibori-win-x64.zip`を展開し、`Shibori.exe`を実行します。配布版はWindows x64向けのself-contained版です。
 
-Windows上で .NET 8 SDK を使い、`dotnet build Shibori.csproj` を実行してください。
+## 使い方
 
-実機の表示構成を変更する機能は次の段階で追加します。まずはモニター列挙とUIの動作を確認できる骨格を提供します。
+1. Shiboriを起動します。
+2. 接続中のモニターはチェック済みで表示されます。
+3. 一時停止したいモニターのチェックを外します。
+4. 戻すときは、対象モニターのチェックを入れます。
 
+メインモニターは安全のため停止できません。表示構成を変更するときは、切断前の構成を自動的に保存します。
+
+## 動作環境
+
+- Windows 11
+- x64 PC
+- 複数モニター環境
+
+## 注意
+
+表示構成を変更するアプリのため、作業中のウィンドウ配置が変わる場合があります。復元操作が完了するまでアプリを終了しないでください。
+
+## ライセンス
+
+Apache License 2.0。詳細は[LICENSE](LICENSE)を参照してください。
+
+開発者向け情報は[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)にまとめています。

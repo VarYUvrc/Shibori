@@ -14,11 +14,13 @@ public partial class App : Application
         var args = Environment.GetCommandLineArgs();
         diagnosticMode = args.Any(arg => string.Equals(arg, "--diagnose", StringComparison.OrdinalIgnoreCase)
             || string.Equals(arg, "--self-test", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase));
+            || string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(arg, "--partial-test", StringComparison.OrdinalIgnoreCase));
         if (diagnosticMode)
         {
             if (args.Any(arg => string.Equals(arg, "--self-test", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunSelfTest();
             else if (args.Any(arg => string.Equals(arg, "--pause-only", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunPauseOnly();
+            else if (args.Any(arg => string.Equals(arg, "--partial-test", StringComparison.OrdinalIgnoreCase))) DiagnosticRunner.RunPartialRestoreTest();
             else DiagnosticRunner.Run();
         }
     }
@@ -94,6 +96,29 @@ internal static class DiagnosticRunner
         }
         catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
         log.AppendLine($"[{DateTimeOffset.Now:O}] pause-only test finished");
+        File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
+    }
+
+    public static void RunPartialRestoreTest()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+        var log = new StringBuilder();
+        log.AppendLine($"[{DateTimeOffset.Now:O}] partial-restore test started");
+        try
+        {
+            var service = new DisplayConfigurationService();
+            var monitors = service.GetMonitors().Where(monitor => !monitor.IsPrimary && monitor.IsConnected).ToArray();
+            if (monitors.Length < 2) throw new InvalidOperationException("サブモニターが2台必要です。");
+            service.Pause([monitors[0]]);
+            service.Pause([monitors[1]]);
+            service.Restore(monitors[0]);
+            var middle = service.GetMonitors();
+            log.AppendLine($"After restoring one: connected={middle.Count(monitor => monitor.IsConnected)}, stopped={middle.Count(monitor => !monitor.IsConnected)}");
+            service.Restore(monitors[1]);
+            log.AppendLine($"After restoring both: connected={service.GetMonitors().Count(monitor => monitor.IsConnected)}");
+        }
+        catch (Exception ex) { log.AppendLine($"ERROR: {ex}"); }
+        log.AppendLine($"[{DateTimeOffset.Now:O}] partial-restore test finished");
         File.AppendAllText(LogPath, log.ToString(), Encoding.UTF8);
     }
 }
